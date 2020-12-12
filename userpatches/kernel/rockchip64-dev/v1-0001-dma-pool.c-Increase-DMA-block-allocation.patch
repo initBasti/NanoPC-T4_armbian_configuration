@@ -1,0 +1,36 @@
+From b828f5298642cc4766f2b91a08d0bc440d9a31c8 Mon Sep 17 00:00:00 2001
+From: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+Date: Wed, 11 Nov 2020 19:36:04 +0100
+Subject: [PATCH v1] dma: pool.c: Increase DMA block allocation
+
+Ported from armbian build 5.9.y.
+
+Signed-off-by: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+---
+ kernel/dma/pool.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/kernel/dma/pool.c b/kernel/dma/pool.c
+index d4637f72239b..cad0fc6636a7 100644
+--- a/kernel/dma/pool.c
++++ b/kernel/dma/pool.c
+@@ -192,13 +192,11 @@ static int __init dma_atomic_pool_init(void)
+ 	int ret = 0;
+ 
+ 	/*
+-	 * If coherent_pool was not used on the command line, default the pool
+-	 * sizes to 128KB per 1GB of memory, min 128KB, max MAX_ORDER-1.
++	 * Always use 2MiB as default pool size.
++	 * See: https://forum.armbian.com/topic/4811-uas-mainline-kernel-coherent-pool-memory-size/
+ 	 */
+ 	if (!atomic_pool_size) {
+-		unsigned long pages = totalram_pages() / (SZ_1G / SZ_128K);
+-		pages = min_t(unsigned long, pages, MAX_ORDER_NR_PAGES);
+-		atomic_pool_size = max_t(size_t, pages << PAGE_SHIFT, SZ_128K);
++		atomic_pool_size = SZ_2M;
+ 	}
+ 	INIT_WORK(&atomic_pool_work, atomic_pool_work_fn);
+ 
+-- 
+2.20.1
+

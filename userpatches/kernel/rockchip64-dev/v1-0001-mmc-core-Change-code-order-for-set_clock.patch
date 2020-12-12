@@ -1,0 +1,34 @@
+From 48658fcd8c22e1745cdb52383c2f41fc6039eb22 Mon Sep 17 00:00:00 2001
+From: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+Date: Wed, 11 Nov 2020 19:32:58 +0100
+Subject: [PATCH v1] mmc: core: Change code order for set_clock
+
+Required to boot NanoPC-T4, ported from armbian build 5.9.y.
+
+Signed-off-by: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+---
+ drivers/mmc/core/mmc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index ff3063ce2acd..876fa4418191 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1372,12 +1372,12 @@ static int mmc_select_hs400es(struct mmc_card *card)
+ 	}
+ 
+ 	mmc_set_timing(host, MMC_TIMING_MMC_HS);
++	mmc_set_clock(host, card->ext_csd.hs_max_dtr);
++
+ 	err = mmc_switch_status(card, true);
+ 	if (err)
+ 		goto out_err;
+ 
+-	mmc_set_clock(host, card->ext_csd.hs_max_dtr);
+-
+ 	/* Switch card to DDR with strobe bit */
+ 	val = EXT_CSD_DDR_BUS_WIDTH_8 | EXT_CSD_BUS_WIDTH_STROBE;
+ 	err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+-- 
+2.20.1
+

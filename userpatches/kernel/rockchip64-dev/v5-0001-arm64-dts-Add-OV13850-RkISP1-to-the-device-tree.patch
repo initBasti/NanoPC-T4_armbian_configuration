@@ -1,0 +1,176 @@
+From f0e7c154036a1eeb9a1a2149e57a237d2e756745 Mon Sep 17 00:00:00 2001
+From: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+Date: Mon, 16 Nov 2020 13:57:20 +0100
+Subject: [PATCH v5] arm64:dts: Add OV13850 & RkISP1 to the device tree
+
+The OV13850 camera sensor device tree addition to the I2C1 node
+was ported from the BSP kernel from friendlyElec.
+The RkISP1 is part of another unmerged patch series by Helen Koike.
+(https://patchwork.kernel.org/project/linux-media/patch/20201020193850.1460644-9-helen.koike@collabora.com/)
+
+Connect the camera sensor to the ISP directly and set the mipi_dphy_rx0 as the physical layer.
+
+Define the configuration for the regulators used by the OV13850
+camera sensor. The values are taken from the datasheet. See:
+(http://www.t-firefly.com/download/firefly-rk3288/peripherals/Sensor_OV13850-G04A_OmniVision_Specification(V1.1).pdf#page=26)
+
+Signed-off-by: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+---
+ .../boot/dts/rockchip/rk3399-nanopc-t4.dts    | 89 +++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi      | 26 ++++++
+ 2 files changed, 115 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts b/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
+index e0d75617bb7e..0bbcd05a0e6a 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
+@@ -32,6 +32,30 @@
+ 		vin-supply = <&vcc5v0_sys>;
+ 	};
+ 
++	ov13850_avdd_2p8v: 2p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "ov13850_avdd";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		regulator-always-on;
++	};
++
++	ov13850_dovdd_1p8v: 1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "ov13850_dovdd";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	ov13850_dvdd_1p2v: 1p2v {
++		compatible = "regulator-fixed";
++		regulator-name = "ov13850_dvdd";
++		regulator-min-microvolt = <1200000>;
++		regulator-max-microvolt = <1200000>;
++		regulator-always-on;
++	};
++
+ 	adc-keys {
+ 		compatible = "adc-keys";
+ 		io-channels = <&saradc 1>;
+@@ -99,6 +123,32 @@
+ 	vpcie3v3-supply = <&vcc3v3_sys>;
+ };
+ 
++&i2c1 {
++	status = "okay";
++	ov13850p0: ov13850@10 {
++		compatible = "ovti,ov13850";
++		status = "okay";
++		reg = <0x10>;
++		clocks = <&cru 0x89>;
++		clock-names = "xvclk";
++		avdd-supply = <&ov13850_avdd_2p8v>;
++		dovdd-supply = <&ov13850_dovdd_1p8v>;
++		dvdd-supply = <&ov13850_dvdd_1p2v>;
++
++		reset-gpios = <&gpio2 27 0>;
++		pwdn-gpios = <&gpio2 28 0>;
++		pinctrl-names = "rockchip,camera_default", "rockchip,camera_sleep";
++		pinctrl-0 = <&cam0_default_pins &cif_clkout_a>;
++		pinctrl-1 = <&cam0_default_pins>;
++
++		port {
++			ucam_out0b: endpoint {
++				remote-endpoint = <&mipi_in_ucam0b>;
++				data-lanes = <1 2>;
++			};
++		};
++	};
++};
+ &pinctrl {
+ 	ir {
+ 		ir_rx: ir-rx {
+@@ -106,6 +156,45 @@
+ 			rockchip,pins = <0 RK_PA6 1 &pcfg_pull_none>;
+ 		};
+ 	};
++	cam_pins {
++		cif_clkout_a: cif-clkout-a {
++			rockchip,pins = <2 11 3 &pcfg_pull_none>;
++		};
++
++		cif_clkout_a_sleep: cif-clkout-a-sleep {
++			rockchip,pins = <2 11 0 &pcfg_pull_none>;
++		};
++
++		cam0_default_pins: cam0-default-pins {
++			rockchip,pins = <2 28 0 &pcfg_pull_down>, <2 27 0 &pcfg_pull_none>;
++		};
++
++		cam1_default_pins: cam1-default-pins {
++			rockchip,pins = <0 12 0 &pcfg_pull_down>, <0  8 0 &pcfg_pull_none>;
++		};
++	};
++};
++
++&mipi_dphy_rx0 {
++	status = "okay";
++};
++
++&isp0_mmu {
++	status = "okay";
++};
++
++&isp0 {
++	status = "okay";
++
++	ports {
++		port@0 {
++			mipi_in_ucam0b: endpoint@0 {
++				reg = <0>;
++				remote-endpoint = <&ucam_out0b>;
++				data-lanes = <1 2>;
++			};
++		};
++	};
+ };
+ 
+ &sdhci {
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 1f8bf0cec5c2..4cb13bfada62 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1723,6 +1723,32 @@
+ 		status = "disabled";
+ 	};
+ 
++	isp0: isp0@ff910000 {
++		compatible = "rockchip,rk3399-cif-isp";
++		reg = <0x0 0xff910000 0x0 0x4000>;
++		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH 0>;
++		clocks = <&cru SCLK_ISP0>,
++			 <&cru ACLK_ISP0_WRAPPER>,
++			 <&cru HCLK_ISP0_WRAPPER>;
++		clock-names = "isp", "aclk", "hclk";
++		iommus = <&isp0_mmu>;
++		phys = <&mipi_dphy_rx0>;
++		phy-names = "dphy";
++		power-domains = <&power RK3399_PD_ISP0>;
++		status = "disabled";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port@0 {
++				reg = <0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++	};
++
+ 	isp0_mmu: iommu@ff914000 {
+ 		compatible = "rockchip,iommu";
+ 		reg = <0x0 0xff914000 0x0 0x100>, <0x0 0xff915000 0x0 0x100>;
+-- 
+2.20.1
+

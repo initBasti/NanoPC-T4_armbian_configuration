@@ -1,0 +1,25 @@
+From 5f77a8a7064d5fb0108742e3d29c089f0116e23d Mon Sep 17 00:00:00 2001
+From: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+Date: Sun, 29 Nov 2020 06:31:53 +0100
+Subject: [PATCH v2] media: rkisp1: compile with debugging
+
+Signed-off-by: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+---
+ drivers/media/platform/rockchip/rkisp1/Makefile | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/media/platform/rockchip/rkisp1/Makefile b/drivers/media/platform/rockchip/rkisp1/Makefile
+index ab32a77db8f7..68b9c8ea4353 100644
+--- a/drivers/media/platform/rockchip/rkisp1/Makefile
++++ b/drivers/media/platform/rockchip/rkisp1/Makefile
+@@ -1,6 +1,7 @@
+ # SPDX-License-Identifier: GPL-2.0
+ 
+ obj-$(CONFIG_VIDEO_ROCKCHIP_ISP1) += rockchip-isp1.o
++ccflags-y := -DDEBUG
+ rockchip-isp1-objs += 	rkisp1-capture.o \
+ 			rkisp1-common.o \
+ 			rkisp1-dev.o \
+-- 
+2.20.1
+
