@@ -338,6 +338,9 @@ The application I use for this step is the `cam` command from libcamera, at the 
 Images recorded with v4l2-ctl will therefore be completely dark and greenish. While those algorithms are not implemented in the libcamera yet, it at least configures the controls of the sensor to make the image a little better, and additionally it is also a lot simpler.  
 I do those steps on my laptop as the NanoPC-T4 is configured without a GUI environment so I wouldn't be able to watch the video.
 
+**NOTICE**: The `cam` command currently doesn't work out of the box with the OV13850 camera, as there is a mismatch of image formats between the camera and the Image Signal Processor (the camera sensor uses a resolution that is bigger than the maximum allowed resolution of the ISP and libcamera can't handle this).
+I am currently working on a patch that fixes the issue, the patch is not merged yet, but you can already use it. Just [download](https://patchwork.libcamera.org/patch/10660/mbox/) the patch and apply it to your libcamera tree with: `cd /path/to/libcamera_tree && git am /path/to/patch.patch`. Afterward, build: `ninja -C build` and install `sudo ninja -C build install`.
+
 Here is a small script, which records with the standard settings of libcamera, moves the data to the host, and converts to mp4.
 Depends on: `sudo apt-get install ffmpeg mpv`
 You can locate the script on the root directory of the project as well.
