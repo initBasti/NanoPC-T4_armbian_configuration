@@ -27,9 +27,6 @@ Main() {
 			# your code here
 			;;
 		bullseye)
-			python3 -m pip install meson --user --upgrade
-			git clone git://linuxtv.org/libcamera.git
-			git clone https://git.linuxtv.org//v4l-utils.git
 			;;
 		bionic)
 			# your code here
