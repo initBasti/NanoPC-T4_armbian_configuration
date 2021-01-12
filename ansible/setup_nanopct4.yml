@@ -1,0 +1,120 @@
+---
+- name: Create the setup for the environment
+  hosts: nanopct4
+  vars:
+      - destdir: /home/{{ ansible_ssh_user }}
+  tasks:
+      - name: Create a folder for patches
+        file:
+            path: "{{ destdir }}/patches"
+            state: directory
+      - name: Install i2c-tools
+        become: yes
+        apt:
+            pkg:
+                - i2c-tools
+
+- name: Install libcamera
+  hosts: nanopct4
+  vars:
+      - destdir: /home/{{ ansible_ssh_user }}/libcamera
+  tasks:
+      - name: Install dependencies
+        become: yes
+        apt:
+            pkg:
+                - git
+                - ninja-build
+                - python3
+                - python3-pip
+                - python3-ply
+                - python3-dev
+                - gcc-10
+                - gcc
+                - python3-yaml
+                - python3-jinja2
+                - libgnutls28-dev
+                - openssl
+                - libboost-dev
+                - pkg-config
+                - debhelper
+                - dh-autoreconf
+                - autotools-dev
+                - autoconf-archive
+                - doxygen
+                - graphviz
+                - libasound2-dev
+                - libtool
+                - libjpeg-dev
+                - libudev-dev
+                - libx11-dev
+                - udev
+                - make
+                - vim
+                - vim-nox
+                - vim-gtk
+                - libevent-dev
+                - g++-10
+                - g++
+                - silversearcher-ag
+                - cmake
+
+      - name: Clone repository
+        git:
+            repo: 'https://git.libcamera.org/libcamera/libcamera.git/'
+            dest: "{{ destdir }}"
+            update: no
+
+      - name: Install most recent version of meson
+        shell:
+            "python3 -m pip install meson --user --upgrade"
+
+      - name: Install the most recent version of meson for root as well (needed for installation)
+        become: yes
+        shell:
+            "python3 -m pip install meson --user --upgrade"
+
+      - name: Create build directory with meson
+        command: chdir={{ destdir }} /home/{{ ansible_ssh_user }}/.local/bin/meson build
+
+      - name: Build the project with ninja
+        command: chdir={{ destdir }} ninja -C build
+
+      - name: Install the project with ninja
+        become: yes
+        command: 'chdir={{ destdir }} ninja -C build install'
+
+      - name: Add the path where the shared library is located to the PKG_CONFIG_PATH
+        lineinfile:
+            dest=/home/{{ ansible_ssh_user }}/.bashrc line='export PKG_CONFIG_PATH=/usr/local/lib/aarch64-linux-gnu:$PKG_CONFIG_PATH' insertafter='EOF' regexp='export PKG_CONFIG_PATH=/usr/local/lib/aarch64-linux-gnu:$PKG_CONFIG_PATH' state=present
+
+      - name: Run ldconfig
+        become: yes
+        command: "ldconfig"
+
+- name: Install V4L2 utils
+  hosts: nanopct4
+  vars:
+      - destdir: /home/{{ ansible_ssh_user }}/v4l2_utils
+  tasks:
+      - name: Clone repository
+        git:
+            repo: 'https://git.linuxtv.org/v4l-utils.git/'
+            dest: "{{ destdir }}"
+            update: no
+
+      - name: Bootstrap the project
+        shell: chdir={{ destdir }} {{ destdir }}/bootstrap.sh
+
+      - name: Configure the project
+        shell: chdir={{ destdir }} {{ destdir }}/configure --disable-qvidcap --disable-qv4l2 --disable-libdvbv5 --disable-doxygen-pdf --disable-doxygen-ps --disable-doxygen-html
+
+      - name: Build the project
+        make:
+            chdir: "{{ destdir }}"
+
+      - name: Install the project
+        make:
+            chdir: "{{ destdir }}"
+            target: install
+        become: yes
