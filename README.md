@@ -1,5 +1,7 @@
 # My setup for kernel development (Media subsystem) on the NanoPC-T4
 
+Last update: 2021-01-12
+
 ## Introduction
 
 This is a summary of steps, that I have performed in order to have a running upstream kernel on my [NanoPC-T4](). I had to spend some time to figure out how to do it properly and would like to make this a little easier for anyone interested in working with this SBC (Single Board Computer), as well as myself in the future ;).
@@ -16,7 +18,16 @@ Here are the steps required to build the image:
 3. [Adjust the specific set of patches that are required but not upstream](#adjust_patches)
 4. [Configure the armbian script](#configure_armbian)
 5. [Build the image and install it onto the SBC](#build_deploy)
-6. [Test the image](#testing)
+6. [Test the image](#testing)  
+    6.1 [Check if the fan works](#fan_check)  
+    6.2 [Test if the camera works properly](#camera_test)  
+    6.3 [Check if all subdevices of the camera pipeline exist](#camera_subdevices)  
+    6.4 [Set up the camera pipeline](#camera_pipeline)  
+    6.5 [Start a test recording](#test_capture)  
+    6.6 [Record to a file and convert to a viewable format](#record_to_file_and_convert)  
+
+7. [Additional topics](#additional_topics)  
+    7.1 [Install additional packages with Ansible](#additional-packages)
 
 ---
 
@@ -98,13 +109,14 @@ Keyboard language setting:
 ```bash
 DEST_LANG="en_US.UTF-8"			# sl_SI.UTF-8, en_US.UTF-8
 ```
-Pre-install applications on the image within the `lib.config` file:
 
-`lib.config`:
-```bash
-PACKAGE_LIST_ADDITIONAL="$PACKAGE_LIST_ADDITIONAL python3 python3-dev python3-pip"
-```
-Make sure that the packages you choose are available on the Debian release picked within the `RELEASE` option.
+**Update (2021-01-12):**  
+**Currently the package list additional option does not work as intended for me (look [here](#additional-packages) for more information)**  
+~~Pre-install applications on the image within the `lib.config` file:~~  
+
+~~`lib.config`:~~  
+~~PACKAGE_LIST_ADDITIONAL="$PACKAGE_LIST_ADDITIONAL python3 python3-dev python3-pip"~~  
+~~Make sure that the packages you choose are available on the Debian release picked within the `RELEASE` option.~~  
 
 #### Further customization of the image from the host machine
 
@@ -147,7 +159,7 @@ If you added most of the configuration options mentioned above, you shouldn't se
 
 In order to write the finished image from `output/image/Armbian_20.11.0-trunk_Nanopct4_{RELEASE}_{BRANCH}_{KERNELVERSION}_minimal.img` to the SD-card, I prefer to use [Balena Etcher](https://www.balena.io/etcher/), but there are multiple [alternatives](https://alternativeto.net/software/etcher/?platform=linux).
 
-#### Boot on NanoPC-T4
+#### Boot on NanoPC-T4 <a name="boot_the_image">
 
 The first thing you will have to do, is to set up the root password, the user login & password, and your full name. I usually quickly attach a USB-keyboard and a monitor for this step. But you can also log in directly via SSH, just be patient the first boot sometimes needs a bit of time. The login for the first boot with root is:
 `ssh root@{IP-address}` and the password is: `1234`. In order to find out, which IP address was assigned to your NanoPC-T4, you could do the following:
@@ -168,7 +180,7 @@ sudo nmap -sn 192.168.198.0/24
 
 At this point, you have a running system, with a secure user and root password, as well as a running ssh connection. One of the first commands, I run to check if the patching went well is: `sudo dmesg`, here I check for any error/warning messages, any drivers that were not able to load, missing device tree nodes, etc. The next step is to check if the hardware behaves like expected, this includes the fan, a camera, the different USB ports, the HDMI port, the audio jack, and the NVME PCIe port for an external SSD, that is located on the backside of the board.
 
-#### Check if the fan works
+#### Check if the fan works <a name=fan_check>
 
 This is in my opinion one of the most crucial checks because you probably don't want to damage your board unexpectedly.
 A simple way to test if the fan works is by increasing the CPU temperature, here is a simple bash script, that repeatedly prints 'yes' to `/dev/null`, while using all processor cores of the system: [source](https://linuxconfig.org/how-to-stress-test-your-cpu-on-linux)
@@ -185,7 +197,7 @@ The easiest way to check the CPU temperature on RK3399 computers that I've disco
 hardinfo -ma devices.so | grep Temperature
 ```
 
-#### Testing the camera
+#### Testing the camera <a name=camera_test>
 
 This part of the system is not crucial, but it is the area I am working on, so I take a closer look at it.
 
@@ -225,7 +237,7 @@ export PKG_CONFIG_PATH=/usr/local/lib/aarch64-linux-gnu:$PKG_CONFIG_PATH
 sudo ldconfig
 ```
 
-##### Check if the sub-devices are detected
+##### Check if the sub-devices are detected <a name="camera_subdevices">
 
 If you look into `/dev`, you will find a couple of video related devices, for me it looks like this:
 ```bash
@@ -276,7 +288,7 @@ In this reduced example, you can see that the camera pipeline consists of an ISP
 
 Your output should look similar to mine, if you want to proceed with the next steps.
 
-##### Build a camera pipeline
+##### Build a camera pipeline <a name="camera_pipeline">
 
 We can manually configure a camera pipeline using the `media-ctl` command. For example, the following command activates the link from the 2nd pad of the ISP to pad 0 of the mainpath entity:
 ```bash
@@ -312,7 +324,7 @@ v4l2-ctl --media-bus-info "platform:rkisp1" --device "rkisp1_mainpath" --set-fmt
 
 Check the output of `media-ctl -p` to check if the entities were set up properly.
 
-##### Make a test capture
+##### Make a test capture <a name="test_capture">
 
 With a fully configured pipeline, we can now try to make a little test recording to memory only.
 
@@ -331,12 +343,12 @@ And if it worked you will see something like this:
 <<<<<<<<<<
 ```
 
-##### Record to a file and convert to a viewable format
+##### Record to a file and convert to a viewable format <a name="record_to_file_and_convert">
 
 Alright, the camera works as a little bonus, I will now quickly show how to watch the recorded video.  
 The application I use for this step is the `cam` command from libcamera, at the moment of writing this, there is no way of working with the statistics data from the ISP to configure the ISP properly with the correct parameters for stuff like *auto white balance*, *exposure*, etc.  
 Images recorded with v4l2-ctl will therefore be completely dark and greenish. While those algorithms are not implemented in the libcamera yet, it at least configures the controls of the sensor to make the image a little better, and additionally it is also a lot simpler.  
-I do those steps on my laptop as the NanoPC-T4 is configured without a GUI environment so I wouldn't be able to watch the video.
+I do those steps on my laptop as the NanoPC-T4 is configured without a GUI environment, so I wouldn't be able to watch the video.
 
 **NOTICE**: The `cam` command currently doesn't work out of the box with the OV13850 camera, as there is a mismatch of image formats between the camera and the Image Signal Processor (the camera sensor uses a resolution that is bigger than the maximum allowed resolution of the ISP and libcamera can't handle this).
 I am currently working on a patch that fixes the issue, the patch is not merged yet, but you can already use it. Just [download](https://patchwork.libcamera.org/patch/10660/mbox/) the patch and apply it to your libcamera tree with: `cd /path/to/libcamera_tree && git am /path/to/patch.patch`. Afterward, build: `ninja -C build` and install `sudo ninja -C build install`.
@@ -379,3 +391,49 @@ rm $local_in
 mpv $local_out
 rm $local_out
 ```
+
+### Additional topics <a name="additonal_topics">
+
+#### Installing additional packages <a name="additional-packages">
+
+As of late, I was not able to build an armbian image using the `PACKAGE_LIST_ADDITIONAL` configuration option within the `userpatches/lib.config` file. [link to forum post](https://forum.armbian.com/topic/16740-debootstrap-base-system-second-stage-failed/)  
+The error message that I recieved looks like this:
+```bash
+[ o.k. ] Installing base system [ Stage 2/2 ]
+/bin/bash: warning: setlocale: LC_ALL: cannot change locale (en_US.UTF-8)
+W: Failure trying to run:  /sbin/ldconfig
+W: See //debootstrap/debootstrap.log for details
+[ error ] ERROR in function create_rootfs_cache [ debootstrap.sh:177 ]
+[ error ] Debootstrap base system second stage failed 
+[ o.k. ] Process terminated 
+[ o.k. ] Unmounting [ /home/basti/Kernel/build/.tmp/rootfs-dev-nanopct4-bullseye-no-yes/ ]
+[ error ] ERROR in function unmount_on_exit [ image-helpers.sh:66 ]
+[ error ] debootstrap-ng was interrupted 
+```
+
+I have switched to [Ansible](https://www.ansible.com/) for this job now, I have added my ansible playbook to this project and will briefly explain how it works below.
+Install ansible on ubuntu/debian:
+```bash
+sudo apt-get install ansible
+```
+
+In order to install the dependencies and set up a development setup, Ansible requires you to specify the host on which you want to work. Simply add the following line to your `/etc/ansible/hosts` file ([Use the IP address](#boot_the_image) of your NanoPC-T4 and the username of the [created user](#boot_the_image)):
+```bash
+sudo sh -c "echo '[SBC]\nnanopct4 ansible_host={IP_ADDRESS} ansible_user={REMOTE_USER} ansible_connection=ssh' >> /etc/ansible/hosts"
+```
+The line above does the following:
+- Add a host group `SBC`, which can later be used to perform a certain action on multiple devices at once
+- Add a alias `nanopct4` for the ssh-connection to the device with ip address `ansible_host` and the user `ansible_user`.
+
+And now run execute the playbook:  
+```bash
+# Add your ssh public key to the device
+ssh-copy-id {REMOTE_USER}@{IP_ADDRESS}
+# Add a ssh key agent and add the ssh key to it
+eval $(ssh-agent)
+ssh-add
+# Run the playbook, with sudo access (-kK), Enter the password of the {REMOTE_USER}
+ansible-playbook /path/to/setup_nanopct4.yml -kK
+```
+
+Obviously, the Ansible playbook provided within this project is specifically crafted for my needs, but you should be able to adjust it according to your desired outcome.
