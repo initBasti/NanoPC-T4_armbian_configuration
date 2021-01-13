@@ -1,27 +1,29 @@
-From 40f427b200a245b00130210a903bf9e02d12c8df Mon Sep 17 00:00:00 2001
+From eb4b7ab3c3eaf840fcb426b545838fa3cc033d8d Mon Sep 17 00:00:00 2001
 From: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
-Date: Sun, 29 Nov 2020 06:55:36 +0100
-Subject: [PATCH v3] media: i2c: OV13850 image sensor support
+Date: Sun, 10 Jan 2021 08:27:33 +0100
+Subject: [PATCH v5] media: i2c: OV13850 image sensor support
 
 Add support for the image sensor and the subdev driver.
 Add device tree bindings.
 Ported from the rockchip development tree.
 
+Add the get_selection IOCTL for the subdevice.
+
 Signed-off-by: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
 ---
  drivers/media/i2c/Kconfig             |   12 +
  drivers/media/i2c/Makefile            |    1 +
- drivers/media/i2c/ov13850.c           | 1607 +++++++++++++++++++++++++
+ drivers/media/i2c/ov13850.c           | 1709 +++++++++++++++++++++++++
  include/uapi/linux/rk-camera-module.h |  146 +++
- 4 files changed, 1766 insertions(+)
+ 4 files changed, 1868 insertions(+)
  create mode 100644 drivers/media/i2c/ov13850.c
  create mode 100644 include/uapi/linux/rk-camera-module.h
 
 diff --git a/drivers/media/i2c/Kconfig b/drivers/media/i2c/Kconfig
-index 369b6d859da5..b4a8782e6758 100644
+index 2b9d81e4794a..fa450009e82f 100644
 --- a/drivers/media/i2c/Kconfig
 +++ b/drivers/media/i2c/Kconfig
-@@ -1065,6 +1065,18 @@ config VIDEO_OV9734
+@@ -1078,6 +1078,18 @@ config VIDEO_OV9734
  	  To compile this driver as a module, choose M here: the
  	  module's name is ov9734.
  
@@ -41,10 +43,10 @@ index 369b6d859da5..b4a8782e6758 100644
  	tristate "OmniVision OV13858 sensor support"
  	depends on I2C && VIDEO_V4L2
 diff --git a/drivers/media/i2c/Makefile b/drivers/media/i2c/Makefile
-index b448506ce503..441237cdf7a1 100644
+index a3149dce21bb..6c5bcbc31a4e 100644
 --- a/drivers/media/i2c/Makefile
 +++ b/drivers/media/i2c/Makefile
-@@ -84,6 +84,7 @@ obj-$(CONFIG_VIDEO_OV8856) += ov8856.o
+@@ -85,6 +85,7 @@ obj-$(CONFIG_VIDEO_OV8856) += ov8856.o
  obj-$(CONFIG_VIDEO_OV9640) += ov9640.o
  obj-$(CONFIG_VIDEO_OV9650) += ov9650.o
  obj-$(CONFIG_VIDEO_OV9734) += ov9734.o
@@ -54,10 +56,10 @@ index b448506ce503..441237cdf7a1 100644
  obj-$(CONFIG_VIDEO_MT9M032) += mt9m032.o
 diff --git a/drivers/media/i2c/ov13850.c b/drivers/media/i2c/ov13850.c
 new file mode 100644
-index 000000000000..5dca59ef7e47
+index 000000000000..d2b2fa8f4654
 --- /dev/null
 +++ b/drivers/media/i2c/ov13850.c
-@@ -0,0 +1,1607 @@
+@@ -0,0 +1,1709 @@
 +// SPDX-License-Identifier: GPL-2.0
 +/*
 + * ov13850 driver
@@ -143,6 +145,14 @@ index 000000000000..5dca59ef7e47
 +
 +#define OV13850_NAME			"ov13850"
 +
++/* OV13850 active pixel array size */
++#define OV13850_PIXEL_ARRAY_LEFT	16U
++#define OV13850_PIXEL_ARRAY_TOP		8U
++#define OV13850_PIXEL_ARRAY_WIDTH	4224U
++#define OV13850_PIXEL_ARRAY_HEIGHT	3136U
++#define OV13850_NATIVE_WIDTH		4256U
++#define OV13850_NATIVE_HEIGHT		3152U
++
 +static const struct regval *ov13850_global_regs;
 +
 +static const char * const ov13850_supply_names[] = {
@@ -159,8 +169,13 @@ index 000000000000..5dca59ef7e47
 +};
 +
 +struct ov13850_mode {
++	/* Frame width & height */
 +	u32 width;
 +	u32 height;
++
++	/* Analog crop rectangle */
++	struct v4l2_rect crop;
++
 +	struct v4l2_fract max_fps;
 +	u32 hts_def;
 +	u32 vts_def;
@@ -696,9 +711,22 @@ index 000000000000..5dca59ef7e47
 +};
 +
 +static const struct ov13850_mode supported_modes[] = {
++	/* 2x2 binned 30 fps mode */
 +	{
 +		.width = 2112,
 +		.height = 1568,
++//		.crop = {
++//			.left = 1072,
++//			.top = 792,
++//			.width = 2112,
++//			.height = 1568
++//		},
++		.crop = {
++			.left = OV13850_PIXEL_ARRAY_LEFT,
++			.top = OV13850_PIXEL_ARRAY_TOP,
++			.width = OV13850_PIXEL_ARRAY_WIDTH,
++			.height = OV13850_PIXEL_ARRAY_HEIGHT
++		},
 +		.max_fps = {
 +			.numerator = 10000,
 +			.denominator = 300000,
@@ -707,9 +735,17 @@ index 000000000000..5dca59ef7e47
 +		.hts_def = 0x12c0,
 +		.vts_def = 0x0680,
 +		.reg_list = ov13850_2112x1568_regs,
-+	},{
++	},
++	/* 13.2 megapixel 30fps full resolution mode */
++	{
 +		.width = 4224,
 +		.height = 3136,
++		.crop = {
++			.left = OV13850_PIXEL_ARRAY_LEFT,
++			.top = OV13850_PIXEL_ARRAY_TOP,
++			.width = OV13850_PIXEL_ARRAY_WIDTH,
++			.height = OV13850_PIXEL_ARRAY_HEIGHT
++		},
 +		.max_fps = {
 +			.numerator = 20000,
 +			.denominator = 150000,
@@ -719,6 +755,21 @@ index 000000000000..5dca59ef7e47
 +		.vts_def = 0x0d00,
 +		.reg_list = ov13850_4224x3136_regs,
 +	},
++//	/* 1080p 60fps cropped */
++//	{
++//		.width = 2112,
++//		.heigth = 1188,
++//		.crop = {
++//			.left = 1072,
++//			.top = 982,
++//			.width = 2112,
++//			.height = 1188
++//		},
++//		.exp_def = 0x0600,
++//		.hts_def = 0x12c0,
++//		.vts_def = 0x0d00,
++//		.reg_list = ov13850_2112x1568_regs
++//	}
 +};
 +
 +static const s64 link_freq_menu_items[] = {
@@ -900,6 +951,58 @@ index 000000000000..5dca59ef7e47
 +	mutex_unlock(&ov13850->mutex);
 +
 +	return 0;
++}
++
++static const struct v4l2_rect *
++__ov13850_get_pad_crop(struct ov13850 *ov13850,
++		       struct v4l2_subdev_pad_config *cfg,
++		       unsigned int pad, enum v4l2_subdev_format_whence which)
++{
++	switch (which) {
++	case V4L2_SUBDEV_FORMAT_TRY:
++		return v4l2_subdev_get_try_crop(&ov13850->subdev, cfg, pad);
++	case V4L2_SUBDEV_FORMAT_ACTIVE:
++		return &ov13850->cur_mode->crop;
++	}
++
++	return NULL;
++}
++
++static int ov13850_get_selection(struct v4l2_subdev *sd,
++				 struct v4l2_subdev_pad_config *cfg,
++				 struct v4l2_subdev_selection *sel)
++{
++	switch (sel->target) {
++	case V4L2_SEL_TGT_CROP: {
++		struct ov13850 *ov13850 = to_ov13850(sd);
++
++		mutex_lock(&ov13850->mutex);
++		sel->r = *__ov13850_get_pad_crop(ov13850, cfg, sel->pad,
++						 sel->which);
++		mutex_unlock(&ov13850->mutex);
++
++		return 0;
++	}
++
++	case V4L2_SEL_TGT_NATIVE_SIZE:
++		sel->r.top = 0;
++		sel->r.left = 0;
++		sel->r.width = OV13850_NATIVE_WIDTH;
++		sel->r.height = OV13850_NATIVE_HEIGHT;
++
++		return 0;
++
++	case V4L2_SEL_TGT_CROP_DEFAULT:
++	case V4L2_SEL_TGT_CROP_BOUNDS:
++		sel->r.top = OV13850_PIXEL_ARRAY_TOP;
++		sel->r.left = OV13850_PIXEL_ARRAY_LEFT;
++		sel->r.width = OV13850_PIXEL_ARRAY_WIDTH;
++		sel->r.height = OV13850_PIXEL_ARRAY_HEIGHT;
++
++		return 0;
++	};
++
++	return -EINVAL;
 +}
 +
 +static int ov13850_enum_mbus_code(struct v4l2_subdev *sd,
@@ -1279,6 +1382,7 @@ index 000000000000..5dca59ef7e47
 +	.enum_frame_size = ov13850_enum_frame_sizes,
 +	.get_fmt = ov13850_get_fmt,
 +	.set_fmt = ov13850_set_fmt,
++	.get_selection = ov13850_get_selection,
 +};
 +
 +static const struct v4l2_subdev_ops ov13850_subdev_ops = {
@@ -1818,5 +1922,5 @@ index 000000000000..9883565799e7
 +
 +#endif /* _UAPI_RKMODULE_CAMERA_H */
 -- 
-2.20.1
+2.25.1
 
