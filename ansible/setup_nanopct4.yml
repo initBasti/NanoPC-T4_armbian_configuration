@@ -13,6 +13,7 @@
         apt:
             pkg:
                 - i2c-tools
+                - gdb
 
 - name: Install libcamera
   hosts: nanopct4
@@ -92,6 +93,10 @@
         become: yes
         command: "ldconfig"
 
+      - name: Change the owner of all files within libcamera
+        become: yes
+        shell: chdir={{ destdir }} sudo chown -R basti:basti .
+
 - name: Install V4L2 utils
   hosts: nanopct4
   vars:
@@ -108,6 +113,9 @@
 
       - name: Configure the project
         shell: chdir={{ destdir }} {{ destdir }}/configure --disable-qvidcap --disable-qv4l2 --disable-libdvbv5 --disable-doxygen-pdf --disable-doxygen-ps --disable-doxygen-html
+
+      - name: fix autoreconf problem
+        shell: chdir={{ destdir }} autoreconf -fi
 
       - name: Build the project
         make:
