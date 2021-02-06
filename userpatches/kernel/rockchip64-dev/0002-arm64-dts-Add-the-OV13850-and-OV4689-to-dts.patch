@@ -1,29 +1,24 @@
-From c1d1281b1ce7adc3075a902a0f6fadfbcc53e882 Mon Sep 17 00:00:00 2001
-From: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
-Date: Sun, 10 Jan 2021 07:22:32 +0100
-Subject: [PATCH] arm64:dts: Add OV13850 to the device tree
+From 353efbedd40f27e4f6ae5a653ef5ee9c2e00829e Mon Sep 17 00:00:00 2001
+From: Sebastian Fricke <sebastian.fricke@posteo.net>
+Date: Sat, 6 Feb 2021 08:23:14 +0100
+Subject: [PATCH 2/3] arm64: dts: Add the OV13850 and OV4689 to dts
 
-The OV13850 camera sensor device tree addition to the I2C1 node
-was ported from the BSP kernel from friendlyElec.
+Add the two offical friendlyElec cameras to the device tree.
+Mostly a copy of what is found on the friendlyElec fork of the rockchip
+downstream BSP kernel tree.
+Additionally, increase the temperature limits on the CPU
 
-Define the configuration for the regulators used by the OV13850
-camera sensor. The values are taken from the datasheet. See:
-(http://www.t-firefly.com/download/firefly-rk3288/peripherals/Sensor_OV13850-G04A_OmniVision_Specification(V1.1).pdf#page=26)
-
-Increase the temperature limits (ported from rockchip64-dev armbian tree and embedded
-into this patch)
-
-Signed-off-by: Sebastian Fricke <sebastian.fricke.linux@gmail.com>
+Signed-off-by: Sebastian Fricke <sebastian.fricke@posteo.net>
 ---
- .../boot/dts/rockchip/rk3399-nanopc-t4.dts    | 92 +++++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi      |  6 +-
- 2 files changed, 95 insertions(+), 3 deletions(-)
+ .../boot/dts/rockchip/rk3399-nanopc-t4.dts    | 165 ++++++++++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi      |   7 +-
+ 2 files changed, 169 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts b/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
-index e0d75617bb7e..8b6301b0dd8f 100644
+index e0d75617bb7e..889d65f867d4 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
 +++ b/arch/arm64/boot/dts/rockchip/rk3399-nanopc-t4.dts
-@@ -32,6 +32,30 @@ vcc5v0_host0: vcc5v0-host0 {
+@@ -32,6 +32,54 @@ vcc5v0_host0: vcc5v0-host0 {
  		vin-supply = <&vcc5v0_sys>;
  	};
  
@@ -51,10 +46,34 @@ index e0d75617bb7e..8b6301b0dd8f 100644
 +		regulator-always-on;
 +	};
 +
++	ov4689_avdd_2p8v: 2p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "ov4689_avdd";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		regulator-always-on;
++	};
++
++	ov4689_dovdd_1p8v: 1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "ov4689_dovdd";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	ov4689_dvdd_1p2v: 1p2v {
++		compatible = "regulator-fixed";
++		regulator-name = "ov4689_dvdd";
++		regulator-min-microvolt = <1200000>;
++		regulator-max-microvolt = <1200000>;
++		regulator-always-on;
++	};
++
  	adc-keys {
  		compatible = "adc-keys";
  		io-channels = <&saradc 1>;
-@@ -99,6 +123,34 @@ &pcie0 {
+@@ -99,6 +147,61 @@ &pcie0 {
  	vpcie3v3-supply = <&vcc3v3_sys>;
  };
  
@@ -78,8 +97,35 @@ index e0d75617bb7e..8b6301b0dd8f 100644
 +		pinctrl-1 = <&cam0_default_pins>;
 +
 +		port {
-+			ucam_out0b: endpoint {
-+				remote-endpoint = <&mipi_in_ucam0b>;
++			ucam_out0a: endpoint {
++				remote-endpoint = <&mipi_in_ucam0a>;
++				data-lanes = <1 2>;
++			};
++		};
++	};
++};
++
++&i2c2 {
++	status = "okay";
++	ov4689p1: ov4689@36 {
++		compatible = "ovti,ov4689";
++		status = "okay";
++		reg = <0x36>;
++		clocks = <&cru 0x89>;
++		clock-names = "xvclk";
++		avdd-supply = <&ov4689_avdd_2p8v>;
++		dovdd-supply = <&ov4689_dovdd_1p8v>;
++		dvdd-supply = <&ov4689_dvdd_1p2v>;
++
++		reset-gpios = <&gpio0 8 0>;
++		pwdn-gpios = <&gpio0 12 0>;
++		pinctrl-names = "rockchip,camera_default", "rockchip,camera_sleep";
++		pinctrl-0 = <&cam1_default_pins &cif_clkout_b>;
++		pinctrl-1 = <&cam1_default_pins>;
++
++		port {
++			ucam_out1a: endpoint {
++				remote-endpoint = <&mipi_in_ucam1a>;
 +				data-lanes = <1 2>;
 +			};
 +		};
@@ -89,7 +135,7 @@ index e0d75617bb7e..8b6301b0dd8f 100644
  &pinctrl {
  	ir {
  		ir_rx: ir-rx {
-@@ -106,6 +158,46 @@ ir_rx: ir-rx {
+@@ -106,6 +209,68 @@ ir_rx: ir-rx {
  			rockchip,pins = <0 RK_PA6 1 &pcfg_pull_none>;
  		};
  	};
@@ -97,6 +143,10 @@ index e0d75617bb7e..8b6301b0dd8f 100644
 +	cam_pins {
 +		cif_clkout_a: cif-clkout-a {
 +			rockchip,pins = <2 11 3 &pcfg_pull_none>;
++		};
++
++		cif_clkout_b: cif_clkout_b {
++			rockchip,pins = <2 15 3 &pcfg_pull_none>;
 +		};
 +
 +		cif_clkout_a_sleep: cif-clkout-a-sleep {
@@ -117,6 +167,10 @@ index e0d75617bb7e..8b6301b0dd8f 100644
 +	status = "okay";
 +};
 +
++&mipi_dsi1 {
++	status = "okay";
++};
++
 +&isp0_mmu {
 +	status = "okay";
 +};
@@ -126,9 +180,23 @@ index e0d75617bb7e..8b6301b0dd8f 100644
 +
 +	ports {
 +		port@0 {
-+			mipi_in_ucam0b: endpoint@0 {
++			mipi_in_ucam0a: endpoint@0 {
 +				reg = <0>;
-+				remote-endpoint = <&ucam_out0b>;
++				remote-endpoint = <&ucam_out0a>;
++				data-lanes = <1 2>;
++			};
++		};
++	};
++};
++
++&isp1 {
++	status = "okay";
++
++	ports {
++		port@0 {
++			mipi_in_ucam1a: endpoint@0 {
++				reg = <0>;
++				remote-endpoint = <&ucam_out1a>;
 +				data-lanes = <1 2>;
 +			};
 +		};
@@ -137,7 +205,7 @@ index e0d75617bb7e..8b6301b0dd8f 100644
  
  &sdhci {
 diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index f5dee5f447bb..dff20b17874d 100644
+index f5dee5f447bb..58d2e6c5104e 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
 @@ -772,17 +772,17 @@ cpu_thermal: cpu {
@@ -161,6 +229,14 @@ index f5dee5f447bb..dff20b17874d 100644
  					hysteresis = <2000>;
  					type = "critical";
  				};
+@@ -1873,6 +1873,7 @@ mipi_dsi1: mipi@ff968000 {
+ 		rockchip,grf = <&grf>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		#phy-cells = <0>;
+ 		status = "disabled";
+ 
+ 		ports {
 -- 
 2.25.1
 
