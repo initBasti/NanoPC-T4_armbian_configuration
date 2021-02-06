@@ -1,6 +1,16 @@
 # My setup for kernel development (Media subsystem) on the NanoPC-T4
 
-Last update: 2021-01-12
+Last update: 2021-02-06
+
+**There is currently a bug in the debootstrap step of the armbian build for arm64 with this setup. Which means that it is currently not possible to create a full image with it, but you can create a kernel with the KERNEL_ONLY='yes' option.**  
+The workaround works like this:
+* Build the full image with a stable version of the armbian build
+* Add the patches from this project and build the latest kernel
+* Use `rsync` to move the finished `*.deb` files from `output/debs/` to the NanoPC-T4
+* Install the new kernel with `sudo dpkg -i /path/to/*.deb`
+* Reboot
+
+---
 
 ## Introduction
 
