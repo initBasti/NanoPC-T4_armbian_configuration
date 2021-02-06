@@ -1,0 +1,91 @@
+From: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+To: linux-media@vger.kernel.org
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>, Sakari Ailus
+ <sakari.ailus@linux.intel.com>, Hans Verkuil <hverkuil-cisco@xs4all.nl>
+Date:   Tue,  2 Feb 2021 15:49:26 +0100
+Subject: [PATCHv3 4/4] dvbdev: add /sys media_dev attr for DVB devices
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset=utf-8
+
+For each DVB device node create a media_dev attribute in /sys
+which contains the media device major and minor number.
+
+It is not created if the CONFIG_MEDIA_CONTROLLER_DVB is not
+defined or if there is no associated media device.
+
+This makes it possible for applications like v4l2-compliance
+to find the associated media controller of a DVB device.
+
+Signed-off-by: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+---
+ drivers/media/dvb-core/dvbdev.c | 45 +++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
+
+diff --git a/drivers/media/dvb-core/dvbdev.c b/drivers/media/dvb-core/dvbdev.c
+index 5ff7bedee247..db8bddcc5780 100644
+--- a/drivers/media/dvb-core/dvbdev.c
++++ b/drivers/media/dvb-core/dvbdev.c
+@@ -452,6 +452,48 @@ static int dvb_register_media_device(struct dvb_device *dvbdev,
+ 	return 0;
+ }
+
++#if defined(CONFIG_MEDIA_CONTROLLER_DVB)
++static ssize_t media_dev_show(struct device *cd,
++			      struct device_attribute *attr, char *buf)
++{
++	struct dvb_device *dvbdev = dev_get_drvdata(cd);
++	dev_t devt = media_device_devt(dvbdev->adapter->mdev);
++
++	buf[0] = '\0';
++	if (!devt)
++		return 0;
++	return sprintf(buf, "%u:%u\n", MAJOR(devt), MINOR(devt));
++}
++static DEVICE_ATTR_RO(media_dev);
++
++static umode_t dvb_device_attr_is_visible(struct kobject *kobj,
++					  struct attribute *attr, int n)
++{
++	struct dvb_device *dvbdev = dev_get_drvdata(kobj_to_dev(kobj));
++
++	if (attr == &dev_attr_media_dev.attr) {
++		if (!dvbdev->adapter->mdev)
++			return 0;
++	}
++	return attr->mode;
++}
++
++static struct attribute *dvb_device_attrs[] = {
++	&dev_attr_media_dev.attr,
++	NULL,
++};
++
++static const struct attribute_group dvb_device_group = {
++	.is_visible = dvb_device_attr_is_visible,
++	.attrs = dvb_device_attrs,
++};
++
++static const struct attribute_group *dvb_device_groups[] = {
++	&dvb_device_group,
++	NULL
++};
++#endif
++
+ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
+ 			const struct dvb_device *template, void *priv,
+ 			enum dvb_device_type type, int demux_sink_pads)
+@@ -1056,6 +1098,9 @@ static int __init init_dvbdev(void)
+ 	}
+ 	dvb_class->dev_uevent = dvb_uevent;
+ 	dvb_class->devnode = dvb_devnode;
++#if defined(CONFIG_MEDIA_CONTROLLER_DVB)
++	dvb_class->dev_groups = dvb_device_groups;
++#endif
+ 	return 0;
+
+ error:
+-- 
+2.29.2
+
+

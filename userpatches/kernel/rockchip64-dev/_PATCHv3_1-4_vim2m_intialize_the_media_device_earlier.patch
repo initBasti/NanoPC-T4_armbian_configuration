@@ -1,0 +1,57 @@
+From: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+To: linux-media@vger.kernel.org
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>, Sakari Ailus
+ <sakari.ailus@linux.intel.com>, Hans Verkuil <hverkuil-cisco@xs4all.nl>
+Date:   Tue,  2 Feb 2021 15:49:23 +0100
+Subject: [PATCHv3 1/4] vim2m: intialize the media device earlier
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset=utf-8
+
+Before the video device node is registered, the v4l2_dev.mdev
+pointer must be set in order to correctly associate the video
+device with the media device. Move the initialization of the
+media device up.
+
+Signed-off-by: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+---
+ drivers/media/test-drivers/vim2m.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/media/test-drivers/vim2m.c b/drivers/media/test-drivers/vim2m.c
+index 331a9053a0ed..a24624353f9e 100644
+--- a/drivers/media/test-drivers/vim2m.c
++++ b/drivers/media/test-drivers/vim2m.c
+@@ -1339,12 +1339,6 @@ static int vim2m_probe(struct platform_device *pdev)
+ 		goto error_dev;
+ 	}
+
+-	ret = video_register_device(vfd, VFL_TYPE_VIDEO, 0);
+-	if (ret) {
+-		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
+-		goto error_m2m;
+-	}
+-
+ #ifdef CONFIG_MEDIA_CONTROLLER
+ 	dev->mdev.dev = &pdev->dev;
+ 	strscpy(dev->mdev.model, "vim2m", sizeof(dev->mdev.model));
+@@ -1353,7 +1347,15 @@ static int vim2m_probe(struct platform_device *pdev)
+ 	media_device_init(&dev->mdev);
+ 	dev->mdev.ops = &m2m_media_ops;
+ 	dev->v4l2_dev.mdev = &dev->mdev;
++#endif
+
++	ret = video_register_device(vfd, VFL_TYPE_VIDEO, 0);
++	if (ret) {
++		v4l2_err(&dev->v4l2_dev, "Failed to register video device\n");
++		goto error_m2m;
++	}
++
++#ifdef CONFIG_MEDIA_CONTROLLER
+ 	ret = v4l2_m2m_register_media_controller(dev->m2m_dev, vfd,
+ 						 MEDIA_ENT_F_PROC_VIDEO_SCALER);
+ 	if (ret) {
+-- 
+2.29.2
+
+

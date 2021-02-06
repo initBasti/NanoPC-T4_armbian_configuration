@@ -1,0 +1,72 @@
+From: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+To: linux-media@vger.kernel.org
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>, Sakari Ailus
+ <sakari.ailus@linux.intel.com>, Hans Verkuil <hverkuil-cisco@xs4all.nl>
+Date:   Tue,  2 Feb 2021 15:49:24 +0100
+Subject: [PATCHv3 2/4] media-device: add media_device_devt function
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset=utf-8
+
+Add a helper function for use by the DVB and V4L2 core frameworks
+that safely returns the major and minor numbers of the media
+device node, or 0 if the device node is not registered.
+
+Signed-off-by: Hans Verkuil <hverkuil-cisco@xs4all.nl>
+---
+ drivers/media/mc/mc-device.c | 16 ++++++++++++++++
+ include/media/media-device.h | 10 ++++++++++
+ 2 files changed, 26 insertions(+)
+
+diff --git a/drivers/media/mc/mc-device.c b/drivers/media/mc/mc-device.c
+index 9e56d2ad6b94..2207f1b01456 100644
+--- a/drivers/media/mc/mc-device.c
++++ b/drivers/media/mc/mc-device.c
+@@ -850,6 +850,22 @@ void media_device_unregister(struct media_device *mdev)
+ }
+ EXPORT_SYMBOL_GPL(media_device_unregister);
+
++dev_t media_device_devt(struct media_device *mdev)
++{
++	dev_t devt = 0;
++
++	if (!mdev)
++		return 0;
++
++	mutex_lock(&mdev->graph_mutex);
++	/* Check if mdev is registered */
++	if (media_devnode_is_registered(mdev->devnode))
++		devt = mdev->devnode->dev.devt;
++	mutex_unlock(&mdev->graph_mutex);
++	return devt;
++}
++EXPORT_SYMBOL_GPL(media_device_devt);
++
+ #if IS_ENABLED(CONFIG_PCI)
+ void media_device_pci_init(struct media_device *mdev,
+ 			   struct pci_dev *pci_dev,
+diff --git a/include/media/media-device.h b/include/media/media-device.h
+index 1345e6da688a..af089b1c55ef 100644
+--- a/include/media/media-device.h
++++ b/include/media/media-device.h
+@@ -300,6 +300,16 @@ int __must_check __media_device_register(struct media_device *mdev,
+  */
+ void media_device_unregister(struct media_device *mdev);
+
++/**
++ * media_device_devt() - return media device major/minor numbers
++ *
++ * @mdev:	pointer to struct &media_device
++ *
++ * Returns 0 if the media device node is not registered, otherwise
++ * it will return the major/minor number of the media device node.
++ */
++dev_t media_device_devt(struct media_device *mdev);
++
+ /**
+  * media_device_register_entity() - registers a media entity inside a
+  *	previously registered media device.
+-- 
+2.29.2
+
+
