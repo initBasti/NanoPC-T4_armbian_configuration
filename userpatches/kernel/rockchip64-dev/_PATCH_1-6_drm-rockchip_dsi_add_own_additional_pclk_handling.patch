@@ -1,0 +1,58 @@
+From: Heiko Stuebner <heiko@sntech.de>
+To: dri-devel@lists.freedesktop.org
+Cc: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
+ linux-rockchip@lists.infradead.org, linux-kernel@vger.kernel.org,
+ hjc@rock-chips.com, heiko@sntech.de, robh+dt@kernel.org,
+ sebastian.fricke@posteo.net, linux-media@vger.kernel.org,
+ dafna.hirschfeld@collabora.com, helen.koike@collabora.com,
+ ezequiel@collabora.com, cmuellner@linux.com, Heiko Stuebner
+ <heiko.stuebner@theobroma-systems.com>
+Date: Tue,  2 Feb 2021 15:56:27 +0100
+Subject: [PATCH 1/6] drm/rockchip: dsi: add own additional pclk handling
+MIME-Version: 1.0
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset=utf-8
+
+From: Heiko Stuebner <heiko.stuebner@theobroma-systems.com>
+
+In a followup patch, we'll need to access the pclk ourself to enable some
+functionality, so get and store it in the rockchip dw-dsi variant as well.
+
+Clocks are refcounted, so possible cascading enablements are
+no problem.
+
+Signed-off-by: Heiko Stuebner <heiko.stuebner@theobroma-systems.com>
+---
+ drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+index 24a71091759c..18e112e30f6e 100644
+--- a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
+@@ -223,6 +223,7 @@ struct dw_mipi_dsi_rockchip {
+ 	void __iomem *base;
+
+ 	struct regmap *grf_regmap;
++	struct clk *pclk;
+ 	struct clk *pllref_clk;
+ 	struct clk *grf_clk;
+ 	struct clk *phy_cfg_clk;
+@@ -1051,6 +1052,13 @@ static int dw_mipi_dsi_rockchip_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+
++	dsi->pclk = devm_clk_get(dev, "pclk");
++	if (IS_ERR(dsi->pclk)) {
++		ret = PTR_ERR(dsi->pclk);
++		DRM_DEV_ERROR(dev, "Unable to get pclk: %d\n", ret);
++		return ret;
++	}
++
+ 	dsi->pllref_clk = devm_clk_get(dev, "ref");
+ 	if (IS_ERR(dsi->pllref_clk)) {
+ 		if (dsi->phy) {
+-- 
+2.29.2
+
+
