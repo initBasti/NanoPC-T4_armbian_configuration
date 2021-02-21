@@ -6,9 +6,9 @@ Cc: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  sebastian.fricke@posteo.net, linux-media@vger.kernel.org,
  dafna.hirschfeld@collabora.com, helen.koike@collabora.com,
  ezequiel@collabora.com, cmuellner@linux.com, Heiko Stuebner
- <heiko.stuebner@theobroma-systems.com>
-Date:   Tue,  2 Feb 2021 15:56:28 +0100
-Subject: [PATCH 2/6] dt-bindings: display: rockchip-dsi: add optional
+ <heiko.stuebner@theobroma-systems.com>, Rob Herring <robh@kernel.org>
+Date: Wed, 10 Feb 2021 12:10:16 +0100
+Subject: [PATCH v2 2/6] dt-bindings: display: rockchip-dsi: add optional
  #phy-cells property
 MIME-Version: 1.0
 Content-Transfer-Encoding: 8bit
@@ -23,6 +23,8 @@ in the rx configuration.
 So allow a #phy-cells property for the dsi controller.
 
 Signed-off-by: Heiko Stuebner <heiko.stuebner@theobroma-systems.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Tested-by: Sebastian Fricke <sebastian.fricke@posteo.net>
 ---
  .../bindings/display/rockchip/dw_mipi_dsi_rockchip.txt           | 1 +
  1 file changed, 1 insertion(+)

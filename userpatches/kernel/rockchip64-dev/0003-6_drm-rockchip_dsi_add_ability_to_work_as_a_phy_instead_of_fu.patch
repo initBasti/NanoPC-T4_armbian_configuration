@@ -7,7 +7,7 @@ Cc: devicetree@vger.kernel.org, linux-arm-kernel@lists.infradead.org,
  dafna.hirschfeld@collabora.com, helen.koike@collabora.com,
  ezequiel@collabora.com, cmuellner@linux.com, Heiko Stuebner
  <heiko.stuebner@theobroma-systems.com>
-Date:   Tue,  2 Feb 2021 15:56:29 +0100
+Date: Wed, 10 Feb 2021 12:10:17 +0100
 Subject: [PATCH 3/6] drm/rockchip: dsi: add ability to work as a phy instead
  of full dsi
 MIME-Version: 1.0
@@ -42,10 +42,11 @@ active, add an empty component to the drm-graph when in phy-mode
 to make the rest of the drm-graph not wait for it.
 
 Signed-off-by: Heiko Stuebner <heiko.stuebner@theobroma-systems.com>
+Tested-by: Sebastian Fricke <sebastian.fricke@posteo.net>
 ---
  drivers/gpu/drm/rockchip/Kconfig              |   2 +
- .../gpu/drm/rockchip/dw-mipi-dsi-rockchip.c   | 334 ++++++++++++++++++
- 2 files changed, 336 insertions(+)
+ .../gpu/drm/rockchip/dw-mipi-dsi-rockchip.c   | 341 ++++++++++++++++++
+ 2 files changed, 343 insertions(+)
 
 diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
 index cb25c0e8fc9b..3094d4533ad6 100644
@@ -61,7 +62,7 @@ index cb25c0e8fc9b..3094d4533ad6 100644
  	select SND_SOC_HDMI_CODEC if ROCKCHIP_CDN_DP && SND_SOC
  	help
 diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
-index 18e112e30f6e..5988a105c141 100644
+index 18e112e30f6e..e322749a5279 100644
 --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
 +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi-rockchip.c
 @@ -14,6 +14,7 @@
@@ -165,7 +166,7 @@ index 18e112e30f6e..5988a105c141 100644
  	return 0;
  }
 
-@@ -1008,11 +1047,220 @@ static const struct dw_mipi_dsi_host_ops dw_mipi_dsi_rockchip_host_ops = {
+@@ -1008,11 +1047,227 @@ static const struct dw_mipi_dsi_host_ops dw_mipi_dsi_rockchip_host_ops = {
  	.detach = dw_mipi_dsi_rockchip_host_detach,
  };
 
@@ -219,7 +220,14 @@ index 18e112e30f6e..5988a105c141 100644
 +		if (ret < 0)
 +			goto err_init;
 +
++		ret = clk_prepare_enable(dsi->grf_clk);
++		if (ret) {
++			clk_disable_unprepare(dsi->pclk);
++			goto err_init;
++		}
++
 +		ret = dsi->cdata->dphy_rx_init(phy);
++		clk_disable_unprepare(dsi->grf_clk);
 +		clk_disable_unprepare(dsi->pclk);
 +		if (ret < 0)
 +			goto err_init;
@@ -386,7 +394,7 @@ index 18e112e30f6e..5988a105c141 100644
  	struct resource *res;
  	const struct rockchip_dw_dsi_chip_data *cdata =
  				of_device_get_match_data(dev);
-@@ -1109,6 +1357,19 @@ static int dw_mipi_dsi_rockchip_probe(struct platform_device *pdev)
+@@ -1109,6 +1364,19 @@ static int dw_mipi_dsi_rockchip_probe(struct platform_device *pdev)
  	dsi->pdata.priv_data = dsi;
  	platform_set_drvdata(pdev, dsi);
 
@@ -406,7 +414,7 @@ index 18e112e30f6e..5988a105c141 100644
  	dsi->dmd = dw_mipi_dsi_probe(pdev, &dsi->pdata);
  	if (IS_ERR(dsi->dmd)) {
  		ret = PTR_ERR(dsi->dmd);
-@@ -1175,6 +1436,75 @@ static const struct rockchip_dw_dsi_chip_data rk3288_chip_data[] = {
+@@ -1175,6 +1443,75 @@ static const struct rockchip_dw_dsi_chip_data rk3288_chip_data[] = {
  	{ /* sentinel */ }
  };
 
@@ -482,7 +490,7 @@ index 18e112e30f6e..5988a105c141 100644
  static const struct rockchip_dw_dsi_chip_data rk3399_chip_data[] = {
  	{
  		.reg = 0xff960000,
-@@ -1217,6 +1547,10 @@ static const struct rockchip_dw_dsi_chip_data rk3399_chip_data[] = {
+@@ -1217,6 +1554,10 @@ static const struct rockchip_dw_dsi_chip_data rk3399_chip_data[] = {
 
  		.flags = DW_MIPI_NEEDS_PHY_CFG_CLK | DW_MIPI_NEEDS_GRF_CLK,
  		.max_data_lanes = 4,
