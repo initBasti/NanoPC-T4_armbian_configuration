@@ -305,7 +305,7 @@ We can manually configure a camera pipeline using the `media-ctl` command. For e
 "media-ctl" "--device" "platform:rkisp1" "--links" "'rkisp1_isp':2 -> 'rkisp1_resizer_mainpath':0 [1]"
 ```
 
-Here is an example of a complete pipeline with explaination, the order of instruction matters:
+Here is an example of a complete pipeline with explaination, the order of instruction matters:  
 ```bash
 # recent all current links
 media-ctl --device "platform:rkisp1" --reset
@@ -333,6 +333,8 @@ v4l2-ctl --media-bus-info "platform:rkisp1" --device "rkisp1_mainpath" --set-fmt
 ```
 
 Check the output of `media-ctl -p` to check if the entities were set up properly.
+
+*(If you get this error: `Unable to parse link: Invalid argument (22)`, then that probably means that the entity you try to link up is not found in the list of entities for the ISP instance. In this case please use `--device /dev/media0` or `--device /dev/media1` (depending on the camera-ISP instance combination))*
 
 ##### Make a test capture <a name="test_capture">
 
