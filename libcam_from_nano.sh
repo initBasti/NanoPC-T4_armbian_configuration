@@ -25,7 +25,7 @@ if ! [[ -f $local_in ]]; then
 fi
 
 # Convert using the standard settings
-ffmpeg -f rawvideo -vcodec rawvideo -s 1920x1920 -r 30 -pix_fmt nv21 -i $local_in -c:v libx264 -preset ultrafast -qp 0 -y -hide_banner $local_out
+ffmpeg -f rawvideo -vcodec rawvideo -s 1920x1920 -r 30 -pix_fmt nv12 -i $local_in -c:v libx264 -preset superfast -qp 0 -y -hide_banner $local_out
 rm $local_in
 
 # Watch the movie
